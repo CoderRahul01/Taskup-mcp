@@ -6,42 +6,39 @@ A production-grade Model Context Protocol (MCP) server for centralized workspace
 
 Connect TaskUp MCP to your favorite AI tools using the configurations below.
 
-### 1. Claude Desktop
+### 1. Claude Desktop (Universal Compatibility Fix)
 
-Add this to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "taskup": {
-      "url": "https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse"
-    }
-  }
-}
-```
-
-### 2. Cursor / Windsurf
-
-- **Cursor**: Open Settings -> Models -> MCP -> Add New Server. Set type to `SSE` and URL to `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse`.
-- **Windsurf**: Add to `~/.codeium/windsurf/mcp_config.json`:
+Claude Desktop sometimes requires a `command` field and may fail with a direct SSE URL. Use this configuration to connect via the built-in compatibility proxy:
 
 ```json
 {
   "mcpServers": {
     "taskup": {
-      "url": "https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse"
+      "command": "bun",
+      "args": [
+        "run",
+        "/Users/rahulpandey187/Documents/future-products/Alumnx/MCP/taskup-mcp/src/server/proxy.ts"
+      ],
+      "env": {
+        "REMOTE_URL": "https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse",
+        "ARCADE_TOKEN": "YOUR_ARCADE_TOKEN"
+      }
     }
   }
 }
 ```
 
-### 3. ChatGPT (Connectors)
+> [!IMPORTANT]
+> Replace the path in `args` with the absolute path to your local `proxy.ts` file.
 
-1. Go to ChatGPT Settings -> Connectors.
-2. Click **Add Remote Server**.
-3. Enter the URL: `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse`.
+### 2. Cursor / Windsurf / ChatGPT
 
-### 4. Zed Editor
+These clients support direct SSE URLs natively:
+
+- **URL**: `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse`
+- **Type**: SSE
+
+### 3. Zed Editor
 
 Add this to your `settings.json`:
 
@@ -65,6 +62,7 @@ Add this to your `settings.json`:
 
 ## Production Readiness
 
+- **Multi-Session Safe**: Supports concurrent sessions via sessionId routing.
 - **Stateless**: No session state stored on server; fully delegated to OAuth tokens.
 - **Schema-Driven**: Strict Zod validation for all inputs and outputs.
 - **Spec-Compliant**: Follows the 2025-11-25 MCP specification.

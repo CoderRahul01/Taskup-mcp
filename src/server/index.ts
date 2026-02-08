@@ -93,7 +93,8 @@ const server = new McpServer({
 // Register tools
 registerTools(server);
 
-let transport: SSEServerTransport | null = null;
+// Map to handle multiple concurrent SSE sessions
+const transports = new Map<string, SSEServerTransport>();
 
 /**
  * MCP SSE Endpoint
@@ -101,12 +102,17 @@ let transport: SSEServerTransport | null = null;
  */
 app.get("/sse", authMiddleware, async (req: express.Request, res: express.Response) => {
   logger.info("New MCP SSE connection attempt");
-  transport = new SSEServerTransport("/messages", res);
+  
+  const transport = new SSEServerTransport("/messages", res);
   await server.connect(transport);
   
+  const sessionId = transport.sessionId;
+  transports.set(sessionId, transport);
+  logger.info({ sessionId }, "Created new MCP SSE session");
+  
   transport.onclose = () => {
-    logger.info("MCP SSE connection closed");
-    transport = null;
+    logger.info({ sessionId }, "MCP SSE connection closed");
+    transports.delete(sessionId);
   };
 });
 
@@ -115,10 +121,19 @@ app.get("/sse", authMiddleware, async (req: express.Request, res: express.Respon
  * Clients send JSON-RPC messages here.
  */
 app.post("/messages", authMiddleware, async (req: express.Request, res: express.Response) => {
-  if (!transport) {
-    res.status(400).json({ error: "No active SSE connection" });
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) {
+    res.status(400).json({ error: "Missing sessionId" });
     return;
   }
+
+  const transport = transports.get(sessionId);
+  if (!transport) {
+    logger.warn({ sessionId }, "Received message for unknown MCP session");
+    res.status(404).json({ error: "Unknown session" });
+    return;
+  }
+
   await transport.handlePostMessage(req, res);
 });
 
