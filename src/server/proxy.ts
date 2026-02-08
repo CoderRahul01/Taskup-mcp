@@ -1,8 +1,6 @@
 import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 
 /**
  * Universal Stdio-to-SSE Proxy
@@ -20,12 +18,14 @@ async function main() {
   console.error(`📡 Connecting to remote SSE: ${remoteUrl}`);
 
   // 1. Setup Remote Transport
+  // Note: We use 'any' for options because some EventSource polyfills support 'headers'
+  // but the standard DOM EventSourceInit type does not.
   const remoteTransport = new SSEClientTransport(new URL(remoteUrl), {
     eventSourceInit: bearerToken ? {
       headers: {
         "Authorization": `Bearer ${bearerToken}`
       }
-    } : undefined,
+    } as Record<string, unknown> as EventSourceInit : undefined,
     requestInit: bearerToken ? {
       headers: {
         "Authorization": `Bearer ${bearerToken}`
@@ -37,9 +37,6 @@ async function main() {
   const localTransport = new StdioServerTransport();
 
   // 3. Simple Pipe Logic
-  // We don't need a full Client/Server instance here if we just want to bridge.
-  // However, using the SDK's transport.onmessage is cleaner.
-
   remoteTransport.onmessage = (message: JSONRPCMessage) => {
     localTransport.send(message).catch(err => {
       console.error("Local send error:", err);
