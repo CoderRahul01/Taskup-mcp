@@ -54,7 +54,7 @@ app.use(mcpAuthMetadataRouter({
   resourceName: "TaskUp MCP",
 }));
 
-const authMiddleware: any[] = [
+const authMiddleware: express.RequestHandler[] = [
   requireBearerAuth({
     verifier: {
       verifyAccessToken: async (token: string) => {
