@@ -6,7 +6,7 @@ We take the security of TaskUp MCP seriously. If you believe you have found a se
 
 ### How to report
 
-Please send an email to [security@alumnx.com](mailto:security@alumnx.com) with the following details:
+Please send an email to [rahulpandey.creates@gmail.com](mailto:rahulpandey.creates@gmail.com) with the following details:
 
 - A description of the vulnerability.
 - Steps to reproduce the issue.
