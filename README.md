@@ -6,7 +6,7 @@ A production-grade Model Context Protocol (MCP) server for centralized workspace
 
 You can connect to this server instantly from any MCP-compliant client.
 
-- **URL**: `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse`
+- **URL**: `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app`
 - **Specification**: MCP 2025-11-25
 
 ### Claude Desktop Configuration
@@ -17,7 +17,7 @@ Add the following to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "taskup": {
-      "url": "https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse"
+      "url": "https://personal-execution-mcp-vfh76wyjna-uc.a.run.app"
     }
   }
 }
@@ -29,7 +29,7 @@ Add the following to your `claude_desktop_config.json`:
 2. Add a new server.
 3. Set Name to `TaskUp`.
 4. Set Type to `SSE`.
-5. Set URL to `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app/sse`.
+5. Set URL to `https://personal-execution-mcp-vfh76wyjna-uc.a.run.app`.
 
 ## Architecture
 

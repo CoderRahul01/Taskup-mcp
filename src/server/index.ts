@@ -3,8 +3,12 @@ import express from "express";
 import cors from "cors";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { mcpAuthMetadataRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { registerTools } from "./capabilities.js";
+import { oauthMetadata, mcpServerUrl, tokenVerifier } from "./auth.js";
 import { logger } from "../utils/logger.js";
+import { authStore } from "../utils/auth-store.js";
 import rateLimit from "express-rate-limit";
 
 const app = express();
@@ -16,9 +20,7 @@ const limiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    error: "Too many requests from this IP, please try again after 15 minutes",
-  },
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" },
 });
 
 app.use(limiter);
@@ -29,15 +31,12 @@ app.use(cors({ origin: "*", exposedHeaders: ["Mcp-Session-Id"] }));
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
-    logger.info(
-      {
-        method: req.method,
-        url: req.url,
-        status: res.statusCode,
-        duration: `${Date.now() - start}ms`,
-      },
-      "HTTP Request",
-    );
+    logger.info({
+      method: req.method,
+      url: req.url,
+      status: res.statusCode,
+      duration: `${Date.now() - start}ms`,
+    }, "HTTP Request");
   });
   next();
 });
@@ -46,6 +45,44 @@ app.use((req, res, next) => {
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Auth Metadata Router (Protected Resource Metadata)
+app.use(mcpAuthMetadataRouter({
+  oauthMetadata,
+  resourceServerUrl: mcpServerUrl,
+  scopesSupported: ["mcp:tools"],
+  resourceName: "TaskUp MCP",
+}));
+
+const authMiddleware: any[] = [
+  requireBearerAuth({
+    verifier: {
+      verifyAccessToken: async (token: string) => {
+        const info = await tokenVerifier.verifyAccessToken(token);
+        return {
+          token: info.token,
+          clientId: info.clientId,
+          scopes: info.scopes,
+        };
+      }
+    },
+    requiredScopes: ["mcp:tools"],
+    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(mcpServerUrl),
+  }),
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.auth) {
+      // capture arcade headers if any
+      const arcadeUserId = req.headers["arcade-user-id"] as string | undefined;
+      authStore.run({
+        token: req.auth.token,
+        userId: arcadeUserId,
+        clientId: req.auth.clientId,
+      }, next);
+    } else {
+      next();
+    }
+  }
+];
 
 // Initialize MCP Server
 const server = new McpServer({
@@ -56,19 +93,17 @@ const server = new McpServer({
 // Register tools
 registerTools(server);
 
-// Store active transports by session ID if needed,
-// though SSEServerTransport typically handles the response stream directly.
 let transport: SSEServerTransport | null = null;
 
 /**
  * MCP SSE Endpoint
  * Clients connect here to start a Server-Sent Events stream.
  */
-app.get("/sse", async (req, res) => {
+app.get("/sse", authMiddleware, async (req: express.Request, res: express.Response) => {
   logger.info("New MCP SSE connection attempt");
   transport = new SSEServerTransport("/messages", res);
   await server.connect(transport);
-
+  
   transport.onclose = () => {
     logger.info("MCP SSE connection closed");
     transport = null;
@@ -79,7 +114,7 @@ app.get("/sse", async (req, res) => {
  * MCP Messages Endpoint
  * Clients send JSON-RPC messages here.
  */
-app.post("/messages", async (req, res) => {
+app.post("/messages", authMiddleware, async (req: express.Request, res: express.Response) => {
   if (!transport) {
     res.status(400).json({ error: "No active SSE connection" });
     return;
